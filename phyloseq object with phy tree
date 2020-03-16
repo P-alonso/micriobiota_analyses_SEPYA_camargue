@@ -1,0 +1,413 @@
+---
+title: "creation object phylo pour unifrac"
+author: "pascal"
+date: "25 novembre 2019"
+output: html_document
+---
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+
+library(tidyverse)
+library(phyloseq)
+library(tidyverse)
+library(vegan)
+
+
+seed <- 123
+ min_reads_root <- 5000 ## define minimum reads threshold
+ min_reads_stem <- 10000 ## define minimum reads threshold
+ min_reads_seed <- 10000 ## define minimum reads threshold
+ min_reads <- 10000
+ width <- 11 ## size plot
+ height <- 11 ## size plot
+taxonomic_levels <- c("Kingdom","Phylum", "Class",
+                      "Order", "Family", "Genus", "Species")
+
+## set working directory
+setwd("~/cirad/cahier de laboratoire/16s chine/analyses fred/test r studio/r-studio_OTU_table/work")
+##load OTUtable
+input <- "Camargue_16S_roots_and_stems_20190920_1593_samples.OTU.filtered.cleaved.nosubstringOTUs.table"
+##load metadata
+metadata <- "camargue_metadata2.txt"
+
+## extract negative and positive control to select cotaminant reads
+read_tsv(input) %>% 
+  filter(! grepl("No_hit", taxonomy)) %>%
+  select(OTU, starts_with("T"),  -total, -taxonomy)->contaminants
+
+    # calculate max reads of control samples
+      contaminants %>%
+        gather(key = "samples", value = "reads", -OTU)%>%
+        mutate(samples = str_replace(samples, "^[tT].*", "control")) %>% # rename control samples by control
+        group_by(OTU, samples) %>%
+        summarize(max = max(reads)) %>%
+        select(-samples)->conta_max
+
+
+## OTU Tables remove contaminant reads and dynamic project (mas du peint)
+read_tsv(input) %>% 
+    filter(! grepl("No_hit|Mitochondria|Chloroplast", taxonomy)) %>%
+    select(-starts_with("T"),-starts_with("D"),-starts_with("vide"),
+           -total, -cloud,-amplicon,	-length,	-abundance,
+           -chimera,	-spread,	-quality,	-sequence, -identity,	
+           -taxonomy,	-references) %>% 
+    gather("samples", "reads", -OTU) %>%
+    left_join(conta_max, by = "OTU") %>%
+    mutate(reads = case_when(
+               is.na(max)  ~ reads,
+               max > reads ~ as.double(0),
+               TRUE      ~ reads - max)) %>%
+    select(-max) %>%
+    spread(samples, reads, fill = 0) -> otu
+
+
+# sum OTU assigned to Mitochondria and Chloroplast to OTU 1 and 2 respectively 
+        read_tsv(input) %>%
+            filter( grepl("Chloroplast", taxonomy)) %>%
+            select(-starts_with("T"),-starts_with("D"),-starts_with("vide"),
+                   -total, -cloud,-amplicon,-length, -abundance, -chimera,
+                   -spread, -quality, -sequence, -identity, -taxonomy,
+                   -references, -OTU) %>%
+            gather("samples", "reads") %>%
+            count(samples, wt = reads) %>%
+            rename (OTU = samples) %>% 
+            rename ("1" = n) %>% 
+            column_to_rownames(var = "OTU") %>%
+            t() %>%
+            as.data.frame() ->df2
+
+        read_tsv(input) %>%
+          filter( grepl("Mitochondria", taxonomy)) %>%    
+          select(-starts_with("T"),-starts_with("D"),-starts_with("vide"),
+                 -total, -cloud,-amplicon,-length, -abundance,-chimera,
+                 -spread, -quality, -sequence, -identity,-taxonomy,
+                 -references, -OTU) %>%
+          gather("samples", "reads") %>%
+          count(samples, wt = reads) %>% 
+          rename (OTU = samples) %>%
+          rename ("2" = n) %>%
+          column_to_rownames(var = "OTU") %>%
+          t() %>%  
+          as.data.frame() %>% 
+          bind_rows(df2, .id="OTU") %>% 
+          mutate(OTU=as.numeric(OTU)) %>% 
+          union(otu, by="OTU")%>% 
+          arrange(OTU)->otu
+              
+## OTU Tables samples : SEPYA for seed, stem and roots
+
+otu [, -grep("-R|-T", colnames(otu))]->s_otu
+
+otu [, -grep("G|-T", colnames(otu))]->r_otu
+
+otu [, -grep("G|-R", colnames(otu))]->t_otu
+
+
+## remove samples under sequensing deep threshold (defined on the line 28)
+    # root samples without plant otu
+    
+            r_otu %>%
+            filter(., !OTU==1) %>% 
+            filter(., !OTU==2) %>% 
+            gather(key = "samples", value = "reads", -OTU) %>%
+            group_by(samples) %>%
+            filter(sum(reads) >= min_reads_root) %>%
+            group_by(OTU) %>% 
+            filter(sum(reads) >= 1) %>% # remove OTU with 0 reads
+            ungroup() %>%
+            spread(samples, reads)-> otu_root 
+            
+
+      # stem samples
+            t_otu %>% 
+              gather(key = "samples", value = "reads", -OTU) %>%
+            group_by(samples) %>%
+            filter(sum(reads) >= min_reads_stem) %>%
+            group_by(OTU) %>% 
+            filter(sum(reads) >= 1) %>% # remove OTU with 0 reads
+            ungroup() %>%
+            spread(samples, reads) -> otu_stem
+
+                
+        # seed samples
+         s_otu %>% 
+            gather(key = "samples", value = "reads", -OTU) %>%
+            group_by(samples) %>%
+            filter(sum(reads) >= min_reads_seed) %>%
+            group_by(OTU) %>% 
+            filter(sum(reads) >= 1) %>% # remove OTU with 0 reads
+            ungroup() %>%
+            spread(samples, reads)-> otu_seed  
+        
+          # ALLsamples
+        otu %>% 
+            gather(key = "samples", value = "reads", -OTU) %>%
+            group_by(samples) %>%
+            filter(sum(reads) >= min_reads) %>%
+            group_by(OTU) %>% 
+            filter(sum(reads) >= 1) %>% # remove OTU with 0 reads
+            ungroup() %>%
+            spread(samples, reads)-> otu  
+ 
+##### Roots: keep OTU present in the two replicates and sum reads of the two replicate
+    otu_root %>%
+      gather(key = "samples", value = "reads", -OTU)  %>%
+      separate(samples, c("samples", "seq_number"), sep = "_") %>%
+      separate(samples, c("samples", "replicats"), sep = "b$")->df
+    
+      df[is.na(df$replicats),"replicats"]<-"a"
+      df[df$replicats == "", "replicats"] <- NA
+      df[is.na(df$replicats),"replicats"]<-"b"
+    
+      df %>%
+        group_by(OTU, samples) %>%
+        mutate(n_replicates = n()) %>%
+        filter(reads > 0) %>%
+        mutate(n_occur = n()) %>%
+        ungroup() %>%
+        mutate(ratio= n_occur/n_replicates) %>%# calculate the prevalence for each OTU in each duplicate
+        mutate(replicats = str_replace(replicats, "a", "")) %>%
+        mutate(removed_otu = replace(n_occur, which(ratio <1), 0)) %>%  # remove OTU presents only in one of the duplicate
+        mutate(removed_otu = replace(removed_otu, which(ratio >= 1), 1)) %>%  # keep only OTU presents in the two duplicate
+        mutate(reads= removed_otu * reads) %>%
+        distinct(OTU, samples, reads) %>% # extract only OTU samples and reads columns
+        group_by(OTU) %>% 
+        filter(sum(reads) >= 1) %>%
+        ungroup() %>% 
+        count(OTU,samples, wt = reads) %>%
+        #group_by(OTU) %>% ##remove otu with prensent in less than 3 sample
+        #filter(n > 0) %>%
+        #mutate(n_occur=n()) %>% 
+        #filter(n_occur > 3) %>%
+        #ungroup() %>%
+        distinct(OTU, samples, n) %>% # extract only OTU samples and reads columns
+        spread(samples, n) %>% 
+        replace(is.na(.), 0)%>% 
+        mutate(OTU2=OTU) %>% 
+        column_to_rownames(var="OTU2") ->otu_root
+                
+                
+ #### Stems and seeds and all samples: sum reads of the two replicate
+
+      otu_stem %>%
+        gather(key = "samples", value = "reads", -OTU)  %>%
+        separate(samples, c("samples", "seq_number"), sep = "_") %>%
+        separate(samples, c("samples", "replicats"), sep = "b$") %>% 
+        count(OTU,samples, wt = reads) %>% #sum reads of replicate
+        #group_by(OTU) %>% ##remove otu with prensent in less than 3 samples
+        #filter(n > 0) %>%
+        #mutate(n_occur=n()) %>% 
+        #filter(n_occur > 3) %>%
+        #ungroup() %>%
+        distinct(OTU, samples, n) %>% # extract only OTU samples and reads columns
+        spread(samples, n) %>% 
+        replace(is.na(.), 0)%>% 
+        mutate(OTU2=OTU) %>% 
+        column_to_rownames(var="OTU2") -> otu_stem
+      
+      otu_seed %>%
+        gather(key = "samples", value = "reads", -OTU)  %>%
+        separate(samples, c("samples", "seq_number"), sep = "_") %>%
+        separate(samples, c("samples", "replicats"), sep = "b$") %>% 
+        count(OTU,samples, wt = reads) %>% #sum reads of replicate
+        #group_by(OTU) %>% ##remove otu with prensent in less than 2 samples
+        #filter(n > 0) %>%
+        #mutate(n_occur=n()) %>% 
+        #filter(n_occur > 2) %>%
+        #ungroup() %>%
+        distinct(OTU, samples, n) %>% # extract only OTU samples and reads columns
+        spread(samples, n) %>% 
+        replace(is.na(.), 0) %>% 
+        mutate(OTU2=OTU) %>% 
+        column_to_rownames(var="OTU2") -> otu_seed  
+      
+      otu %>%
+        gather(key = "samples", value = "reads", -OTU)  %>%
+        separate(samples, c("samples", "seq_number"), sep = "_") %>%
+        separate(samples, c("samples", "replicats"), sep = "b$") %>% 
+        count(OTU,samples, wt = reads) %>% #sum reads of replicate
+        #group_by(OTU) %>% ##remove otu with prensent in less than 3 samples
+        #filter(n > 0) %>%
+        #mutate(n_occur=n()) %>% 
+        #filter(n_occur > 3) %>%
+        #ungroup() %>%
+        distinct(OTU, samples, n) %>% # extract only OTU samples and reads columns
+        spread(samples, n) %>% 
+        replace(is.na(.), 0) -> otu  
+                
+##### make tax_dat
+
+read_tsv(input) %>%
+    select(OTU, taxonomy) %>%
+    separate(taxonomy, taxonomic_levels,
+             sep = "[|]", fill = "right", extra = "drop") %>%
+    mutate_if(is.character,
+              funs(str_replace(.,
+                               "unknown|uncultured|unidentified|\\*",
+                               replacement = NA_character_))) %>%
+    mutate(taxonomy = str_glue_data(.,
+                                    "Root;k__{Kingdom}",
+                                    ";p__{Phylum}",
+                                    ";c__{Class}",
+                                    ";o__{Order}",
+                                    ";f__{Family}",
+                                    ";g__{Genus}",
+                                    ";s__{Species}",
+                                    sep = "|")) %>%
+    mutate(taxonomy = str_glue_data(.,"{taxonomy}",
+                                      ";ssp__{OTU}", 
+                                      sep = "|"))-> tax_data 
+
+otu_root %>% 
+  select(OTU) %>%
+  inner_join(tax_data) %>% 
+  select(-taxonomy) %>% 
+  mutate(OTU2=OTU) %>% 
+  column_to_rownames(var="OTU2")->tax_data_root
+
+otu_stem %>% 
+  select(OTU) %>%
+  inner_join(tax_data) %>% 
+  select(-taxonomy) %>% 
+  mutate(OTU2=OTU) %>% 
+  column_to_rownames(var="OTU2")->tax_data_stem
+
+otu_seed %>% 
+  select(OTU) %>%
+  inner_join(tax_data) %>% 
+  select(-taxonomy) %>% 
+  mutate(OTU2=OTU) %>% 
+  column_to_rownames(var="OTU2")->tax_data_seed
+
+
+   ## prepare metadata, keep only one replicate sample (remove letter a and b and library number)
+read_tsv(metadata) %>% 
+  separate(samples, c("samples", "lib_number"), sep = "_") %>%
+  separate(samples, c("samples", "replicats"), sep = "b$") %>% 
+  mutate(replicats = str_replace(replicats, "//NA", "b"))-> sample_data
+ 
+sample_data[is.na(sample_data$replicats),"replicats"]<-"a"
+sample_data %>% 
+  filter(grepl("a", replicats))-> sample_data  
+
+otu_root %>%
+   select(-OTU) %>% 
+  colnames()%>%
+   as.data.frame() ->sample_data_root 
+
+ colnames(sample_data_root) <- c("samples")
+sample_data_root %>% 
+ inner_join(sample_data)->sample_data_root
+
+otu_stem %>%
+   select(-OTU) %>% 
+  colnames()%>%
+   as.data.frame() ->sample_data_stem 
+
+ colnames(sample_data_stem) <- c("samples")
+sample_data_stem %>% 
+ inner_join(sample_data)->sample_data_stem
+
+otu_seed %>%
+   select(-OTU) %>% 
+  colnames()%>%
+   as.data.frame() ->sample_data_seed 
+
+ colnames(sample_data_seed) <- c("samples")
+sample_data_seed %>% 
+ inner_join(sample_data)->sample_data_seed
+
+
+
+```
+
+
+
+Make Phyloseq object
+```{r}
+
+## Root phyloseq object SEPYA 2017-2018
+
+as.matrix(otu_root) -> otu_root
+as.matrix(otu_stem) -> otu_stem
+as.matrix(otu_seed) -> otu_seed
+as.matrix(otu) -> otu
+
+
+as.matrix(tax_data)-> tax 
+as.matrix(tax_data_root)-> tax_root
+as.matrix(tax_data_stem)-> tax_stem 
+as.matrix(tax_data_seed)-> tax_seed 
+
+
+rownames(sample_data) <- sample_data$samples
+rownames(sample_data_root) <- sample_data_root$samples
+rownames(sample_data_stem) <- sample_data_stem$samples
+rownames(sample_data_seed) <- sample_data_seed$samples
+
+physeq_root<-phyloseq(otu_table(otu_root, taxa_are_rows = TRUE), tax_table(tax_root), sample_data(sample_data)) 
+physeq_stem<-phyloseq(otu_table(otu_stem, taxa_are_rows = TRUE), tax_table(tax_stem), sample_data(sample_data)) 
+physeq_seed<-phyloseq(otu_table(otu_seed, taxa_are_rows = TRUE), tax_table(tax_seed), sample_data(sample_data)) 
+physeq<-phyloseq(otu_table(otu, taxa_are_rows = TRUE), tax_table(tax), sample_data(sample_data))
+
+tree_seed <- "otu_seed_seq.nwk"
+read_tree(tree_seed) ->tree_seed
+phy_tree(physeq_seed) <- tree_seed
+
+tree_stem <- "otu_stem_seq.nwk"
+read_tree(tree_stem) ->tree_stem
+phy_tree(physeq_stem) <- tree_stem
+
+
+tree_root <- "otu_root camargue tree.newick"
+read_tree(tree_root) ->tree_root
+phy_tree(physeq_root) <- tree_root
+
+
+#### control data distribution
+
+readsumsdf = data.frame(nreads = sort(taxa_sums(physeq_root), TRUE), sorted = 1:ntaxa(physeq_root), type = "OTU")
+readsumsdf = rbind(readsumsdf, data.frame(nreads = sort(sample_sums(physeq_root), TRUE), sorted = 1:nsamples(physeq_root), type = "Samples"))
+p.16S = ggplot(readsumsdf, aes(x = sorted, y = nreads)) + geom_bar(stat = "identity")
+p.16S + ggtitle("Total number of reads before Preprocessing 16s root") + scale_y_log10() + facet_wrap(~type, 1, scales = "free")
+
+readsumsdf = data.frame(nreads = sort(taxa_sums(physeq_stem), TRUE), sorted = 1:ntaxa(physeq_stem), type = "OTU")
+readsumsdf = rbind(readsumsdf, data.frame(nreads = sort(sample_sums(physeq_stem), TRUE), sorted = 1:nsamples(physeq_stem), type = "Samples"))
+p.16S = ggplot(readsumsdf, aes(x = sorted, y = nreads)) + geom_bar(stat = "identity")
+p.16S + ggtitle("Total number of reads before Preprocessing 16s stem") + scale_y_log10() + facet_wrap(~type, 1, scales = "free")
+
+readsumsdf = data.frame(nreads = sort(taxa_sums(physeq_seed), TRUE), sorted = 1:ntaxa(physeq_seed), type = "OTU")
+readsumsdf = rbind(readsumsdf, data.frame(nreads = sort(sample_sums(physeq_seed), TRUE), sorted = 1:nsamples(physeq_seed), type = "Samples"))
+p.16S = ggplot(readsumsdf, aes(x = sorted, y = nreads)) + geom_bar(stat = "identity")
+p.16S + ggtitle("Total number of reads before Preprocessing 16s seed") + scale_y_log10() + facet_wrap(~type, 1, scales = "free")
+
+
+#### make rarefaction
+physeq_rare_root = rarefy_even_depth(physeq_root,rngseed = 123)
+physeq_rare_stem = rarefy_even_depth(physeq_stem,rngseed = 123)
+physeq_rare_seed = rarefy_even_depth(physeq_seed,rngseed = 123)
+physeq_rare = rarefy_even_depth(physeq,rngseed = 123)
+#### control data distribution after rarefaction
+
+readsumsdf = data.frame(nreads = sort(taxa_sums(physeq_rare_root), TRUE), sorted = 1:ntaxa(physeq_rare_root), type = "OTU")
+readsumsdf = rbind(readsumsdf, data.frame(nreads = sort(sample_sums(physeq_rare_root), TRUE), sorted = 1:nsamples(physeq_rare_root), type = "Samples"))
+p.16S = ggplot(readsumsdf, aes(x = sorted, y = nreads)) + geom_bar(stat = "identity")
+p.16S + ggtitle("Total number of reads after Preprocessing 16s root") + scale_y_log10() + facet_wrap(~type, 1, scales = "free")
+
+readsumsdf = data.frame(nreads = sort(taxa_sums(physeq_rare_stem), TRUE), sorted = 1:ntaxa(physeq_rare_stem), type = "OTU")
+readsumsdf = rbind(readsumsdf, data.frame(nreads = sort(sample_sums(physeq_rare_stem), TRUE), sorted = 1:nsamples(physeq_rare_stem), type = "Samples"))
+p.16S = ggplot(readsumsdf, aes(x = sorted, y = nreads)) + geom_bar(stat = "identity")
+p.16S + ggtitle("Total number of reads after Preprocessing 16s stem") + scale_y_log10() + facet_wrap(~type, 1, scales = "free")
+
+readsumsdf = data.frame(nreads = sort(taxa_sums(physeq_rare_seed), TRUE), sorted = 1:ntaxa(physeq_rare_seed), type = "OTU")
+readsumsdf = rbind(readsumsdf, data.frame(nreads = sort(sample_sums(physeq_rare_seed), TRUE), sorted = 1:nsamples(physeq_rare_seed), type = "Samples"))
+p.16S = ggplot(readsumsdf, aes(x = sorted, y = nreads)) + geom_bar(stat = "identity")
+p.16S + ggtitle("Total number of reads after Preprocessing 16s stem") + scale_y_log10() + facet_wrap(~type, 1, scales = "free")
+
+
+```
+ Save phyloseq object
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+save(physeq_rare_root,physeq_rare_stem, physeq_rare_seed, physeq_rare, file = "physeq_camargue_with_phy_tree.RData")
+```
+
