@@ -1,0 +1,1268 @@
+---
+title: "Phyloseq camargue alpha div and Jaccard"
+author: "pascal"
+date: "14 novembre 2019"
+output: html_document
+---
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+setwd("~/cirad/cahier de laboratoire/16s chine/analyses fred/test r studio/r-studio_OTU_table/work")
+
+library(reshape2)
+library(phyloseq)
+library(tidyverse)
+library(vegan)
+
+load("physeq_camargue.RData") 
+```
+
+ 
+Root stem and seed microbiota commparison
+=========================================
+ 
+ Alpha`diversity: root stem and seed
+------------------------------------
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+p <- plot_richness(physeq_rare, x="compartment", color="compartment", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="plant compartment")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(compartment,value,colour=compartment,shape=compartment)) +
+  facet_grid(variable ~ compartment, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="plant compartment")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, stage + bloc + compartment + year + varieties + stage_year + varieties_year + varieties_stage ~ variable)
+
+
+## Alpha-div Stats 
+#compartment
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ compartment, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$compartment)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ compartment, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ compartment, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$compartment)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ compartment, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_compartment
+alpha_div_stats_compartment
+
+```
+
+
+Beta-diversity 
+---------------
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+#rich.plus$Observed -> OTU_richness
+
+physeq_rare %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare,"PCoA",dist)
+
+plot_ordination(physeq_rare, 
+                ord,
+                color = "compartment", 
+                shape="year",
+                label= "V",
+                title = "PCoA sqrt Jaccard on root stem and seed samples" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota : plant compartment") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare, "compartment")
+        + get_variable(physeq_rare, "stage")
+       + get_variable(physeq_rare, "year")
+       + get_variable(physeq_rare, "varieties")
+       + get_variable(physeq_rare, "bloc"),permutations = 10000)$aov.tab
+
+```
+Microbiota in root stem and seed separately 
+============================================
+ 
+Alpha`diversity: root 
+---------------------
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+p <- plot_richness(physeq_rare_root, x="stage", color="stage", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="plant stage root")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(stage,value,colour=stage,shape=stage)) +
+  facet_grid(variable ~ stage, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="plant stage root")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, stage + bloc + year + varieties + stage_year + varieties_year + varieties_stage ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ stage, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$stage)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ stage, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ stage, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$stage)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ stage, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_stage_root
+alpha_div_stats_stage_root
+
+```
+Alpha`diversity: stem 
+---------------------
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+p <- plot_richness(physeq_rare_stem, x="stage", color="stage", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="plant stage stem")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(stage,value,colour=stage,shape=stage)) +
+  facet_grid(variable ~ stage, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="plant stage_stem")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, stage + bloc + year + varieties + stage_year + varieties_year + varieties_stage ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ stage, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$stage)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ stage, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ stage, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$stage)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ stage, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_stage_stem
+alpha_div_stats_stage_stem
+
+```
+
+Alpha`diversity: seed 
+---------------------
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+p <- plot_richness(physeq_rare_seed, x="stage", color="stage", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="plant stage seed")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(stage,value,colour=stage,shape=stage)) +
+  facet_grid(variable ~ stage, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="plant stage seed")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, stage + bloc + year + varieties + stage_year + varieties_year + varieties_stage ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ stage, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$stage)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ stage, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ stage, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$stage)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ stage, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_stage_seed
+alpha_div_stats_stage_seed
+
+```
+
+
+Root Beta-diversity  
+--------------------
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_root %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_root,"PCoA",dist)
+
+plot_ordination(physeq_rare_root, 
+                ord,
+                color = "stage", 
+                shape="year",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on root samples" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota : plant stage") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root, "stage")
+       + get_variable(physeq_rare_root, "year")
+       + get_variable(physeq_rare_root, "varieties")
+       + get_variable(physeq_rare_root, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+Stem Beta-diversity  
+--------------------
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_stem %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_stem,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem, 
+                ord,
+                color = "stage", 
+                shape="year",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on stem samples" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota : plant stage") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem, "stage")
+       + get_variable(physeq_rare_stem, "year")
+       + get_variable(physeq_rare_stem, "varieties")
+       + get_variable(physeq_rare_stem, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+seed Beta-diversity  
+--------------------
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_seed %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_seed,"PCoA",dist)
+
+plot_ordination(physeq_rare_seed, 
+                ord,
+                color = "stage", 
+                shape="bloc",
+                label= "V",
+                title = "PCoA sqrt Jaccard on seed samples" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota : plant stage") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_seed, "stage"),permutations = 10000)$aov.tab
+
+```
+
+Year factor between each development stage
+============================================
+
+ Subset physeq stage II and III
+```{r}
+subset_samples(physeq_rare_root, stage %in% c("I")) -> physeq_rare_root_stage_I
+subset_samples(physeq_rare_root, stage %in% c("II")) -> physeq_rare_root_stage_II
+subset_samples(physeq_rare_root, stage %in% c("III")) -> physeq_rare_root_stage_III
+
+
+subset_samples(physeq_rare_stem, stage %in% c("I")) -> physeq_rare_stem_stage_I
+subset_samples(physeq_rare_stem, stage %in% c("II")) -> physeq_rare_stem_stage_II
+subset_samples(physeq_rare_stem, stage %in% c("III")) -> physeq_rare_stem_stage_III
+
+
+```
+
+
+physeq_rare_root_stage_II
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_root_stage_II, x="year", color="year", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_II root")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(year,value,colour=year,shape=year)) +
+  facet_grid(variable ~ year, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="stage_II root")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + year + varieties + stage_year + varieties_year + varieties_stage ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ year, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$year)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ year, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ year, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$year)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ year, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_year_root
+alpha_div_stats_year_root
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_root_stage_II %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_root_stage_II,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_II, 
+                ord,
+                color = "year", 
+                shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on root samples stage_II" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota stage_II") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_II, "year")
+       + get_variable(physeq_rare_root_stage_II, "varieties")
+       + get_variable(physeq_rare_root_stage_II, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+
+physeq_rare_root_stage_III
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_root_stage_III, x="year", color="year", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_III root")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(year,value,colour=year,shape=year)) +
+  facet_grid(variable ~ year, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="stage_III  root")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + year + varieties + stage_year + varieties_year + varieties_stage ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ year, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$year)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ year, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ year, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$year)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ year, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_year_root
+alpha_div_stats_year_root
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_root_stage_III %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_root_stage_III,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_III, 
+                ord,
+                color = "year", 
+                shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on root samples; stage_III" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota stage_III") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_III, "year")
+       + get_variable(physeq_rare_root_stage_III, "varieties")
+       + get_variable(physeq_rare_root_stage_III, "bloc"),permutations = 10000)$aov.tab
+
+```
+physeq_rare_stem_stage_II
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_stem_stage_II, x="year", color="year", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_II stem")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(year,value,colour=year,shape=year)) +
+  facet_grid(variable ~ year, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="stage_II stem")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + year + varieties + stage_year + varieties_year + varieties_stage ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ year, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$year)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ year, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ year, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$year)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ year, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_year_stem
+alpha_div_stats_year_stem
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_stem_stage_II %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_stem_stage_II,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_II, 
+                ord,
+                color = "year", 
+                shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on stem samples stage_II" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota stage_II") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_II, "year")
+       + get_variable(physeq_rare_stem_stage_II, "varieties")
+       + get_variable(physeq_rare_stem_stage_II, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_II
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_stem_stage_III, x="year", color="year", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_III stem")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(year,value,colour=year,shape=year)) +
+  facet_grid(variable ~ year, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="stage_III  stem")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + year + varieties + stage_year + varieties_year + varieties_stage ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ year, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$year)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ year, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ year, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$year)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ year, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_year_stem
+alpha_div_stats_year_stem
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_stem_stage_III %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_stem_stage_III,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_III, 
+                ord,
+                color = "year", 
+                shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on stem samples; stage_III" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota stage_III") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_III, "year")
+       + get_variable(physeq_rare_stem_stage_III, "varieties")
+       + get_variable(physeq_rare_stem_stage_III, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+Rice genotype factor 
+====================
+
+Subset physeq  years
+```{r}
+#root
+subset_samples(physeq_rare_root_stage_II, year %in% c("A_2017")) -> physeq_rare_root_stage_II_A_2017
+
+subset_samples(physeq_rare_root_stage_II, year %in% c("A_2018")) -> physeq_rare_root_stage_II_A_2018
+
+subset_samples(physeq_rare_root_stage_III, year %in% c("A_2017")) -> physeq_rare_root_stage_III_A_2017
+
+subset_samples(physeq_rare_root_stage_III, year %in% c("A_2018")) -> physeq_rare_root_stage_III_A_2018
+
+#stem
+subset_samples(physeq_rare_stem_stage_II, year %in% c("A_2017")) -> physeq_rare_stem_stage_II_A_2017
+
+subset_samples(physeq_rare_stem_stage_II, year %in% c("A_2018")) -> physeq_rare_stem_stage_II_A_2018
+
+subset_samples(physeq_rare_stem_stage_III, year %in% c("A_2017")) -> physeq_rare_stem_stage_III_A_2017
+
+subset_samples(physeq_rare_stem_stage_III, year %in% c("A_2018")) -> physeq_rare_stem_stage_III_A_2018
+```
+
+*root*
+physeq_rare_root_stage_I
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_root_stage_I, x="varieties", color="varieties", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_I root 2017")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(varieties,value,colour=varieties,shape=varieties)) +
+  facet_grid(variable ~ varieties, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="stage_I  root 2017")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + varieties  ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ varieties, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$varieties)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ varieties, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ varieties, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$varieties)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ varieties, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_varieties_root
+alpha_div_stats_varieties_root
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_root_stage_I %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_root_stage_I,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_I, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on root samples; stage_I 2017" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_I 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_I, "varieties")
+       + get_variable(physeq_rare_root_stage_I, "varieties")
+       + get_variable(physeq_rare_root_stage_I, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_root_stage_II_A_2017
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_root_stage_II_A_2017, x="varieties", color="varieties", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_II root 2017")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(varieties,value,colour=varieties,shape=varieties)) +
+  facet_grid(variable ~ varieties, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="stage_II  root 2017")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + varieties  ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ varieties, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$varieties)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ varieties, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ varieties, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$varieties)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ varieties, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_varieties_root
+alpha_div_stats_varieties_root
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_root_stage_II_A_2017 %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_root_stage_II_A_2017,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_II_A_2017, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on root samples; stage_II 2017" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_II 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_II_A_2017, "varieties")
+       + get_variable(physeq_rare_root_stage_II_A_2017, "varieties")
+       + get_variable(physeq_rare_root_stage_II_A_2017, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_root_stage_II_A_2018
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_root_stage_II_A_2018, x="varieties", color="varieties", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_II root 2018")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(varieties,value,colour=varieties,shape=varieties)) +
+  facet_grid(variable ~ varieties, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="stage_II  root 2018")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + varieties  ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ varieties, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$varieties)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ varieties, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ varieties, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$varieties)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ varieties, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_varieties_root
+alpha_div_stats_varieties_root
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_root_stage_II_A_2018 %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_root_stage_II_A_2018,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_II_A_2018, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on root samples; stage_II 2018" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_II 2018") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_II_A_2018, "varieties")
+       + get_variable(physeq_rare_root_stage_II_A_2018, "varieties")
+       + get_variable(physeq_rare_root_stage_II_A_2018, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_root_stage_III_A_2017
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_root_stage_III_A_2017, x="varieties", color="varieties", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_III root 2017")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(varieties,value,colour=varieties,shape=varieties)) +
+  facet_grid(variable ~ varieties, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="stage_III  root 2017")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + varieties  ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ varieties, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$varieties)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ varieties, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ varieties, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$varieties)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ varieties, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_varieties_root
+alpha_div_stats_varieties_root
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_root_stage_III_A_2017 %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_root_stage_III_A_2017,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_III_A_2017, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on root samples; stage_III 2017" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_III 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_III_A_2017, "varieties")
+       + get_variable(physeq_rare_root_stage_III_A_2017, "varieties")
+       + get_variable(physeq_rare_root_stage_III_A_2017, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_root_stage_III_A_2018
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_root_stage_III_A_2018, x="varieties", color="varieties", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_III root 2018")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(varieties,value,colour=varieties,shape=varieties)) +
+  facet_grid(variable ~ varieties, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="stage_III  root 2018")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + varieties  ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ varieties, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$varieties)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ varieties, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ varieties, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$varieties)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ varieties, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_varieties_root
+alpha_div_stats_varieties_root
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_root_stage_III_A_2018 %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_root_stage_III_A_2018,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_III_A_2018, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on root samples; stage_III 2018" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_III 2018") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_III_A_2018, "varieties")
+       + get_variable(physeq_rare_root_stage_III_A_2018, "varieties")
+       + get_variable(physeq_rare_root_stage_III_A_2018, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+*stem*
+physeq_rare_stem_stage_I
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_stem_stage_I, x="varieties", color="varieties", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_I stem 2017")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(varieties,value,colour=varieties,shape=varieties)) +
+  facet_grid(variable ~ varieties, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="stage_I  stem 2017")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + varieties  ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ varieties, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$varieties)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ varieties, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ varieties, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$varieties)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ varieties, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_varieties_stem
+alpha_div_stats_varieties_stem
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_stem_stage_I %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_stem_stage_I,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_I, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on stem samples; stage_I 2017" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_I 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_I, "varieties")
+       + get_variable(physeq_rare_stem_stage_I, "varieties")
+       + get_variable(physeq_rare_stem_stage_I, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_II_A_2017
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_stem_stage_II_A_2017, x="varieties", color="varieties", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_II stem 2017")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(varieties,value,colour=varieties,shape=varieties)) +
+  facet_grid(variable ~ varieties, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="stage_II  stem 2017")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + varieties  ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ varieties, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$varieties)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ varieties, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ varieties, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$varieties)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ varieties, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_varieties_stem
+alpha_div_stats_varieties_stem
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_stem_stage_II_A_2017 %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_stem_stage_II_A_2017,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_II_A_2017, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on stem samples; stage_II 2017" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_II 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_II_A_2017, "varieties")
+       + get_variable(physeq_rare_stem_stage_II_A_2017, "varieties")
+       + get_variable(physeq_rare_stem_stage_II_A_2017, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_II_A_2018
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_stem_stage_II_A_2018, x="varieties", color="varieties", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_II stem 2018")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(varieties,value,colour=varieties,shape=varieties)) +
+  facet_grid(variable ~ varieties, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="stage_II  stem 2018")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + varieties  ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ varieties, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$varieties)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ varieties, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ varieties, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$varieties)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ varieties, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_varieties_stem
+alpha_div_stats_varieties_stem
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_stem_stage_II_A_2018 %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_stem_stage_II_A_2018,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_II_A_2018, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on stem samples; stage_II 2018" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_II 2018") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_II_A_2018, "varieties")
+       + get_variable(physeq_rare_stem_stage_II_A_2018, "varieties")
+       + get_variable(physeq_rare_stem_stage_II_A_2018, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_III_A_2017
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_stem_stage_III_A_2017, x="varieties", color="varieties", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_III stem 2017")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(varieties,value,colour=varieties,shape=varieties)) +
+  facet_grid(variable ~ varieties, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="stage_III  stem 2017")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + varieties  ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ varieties, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$varieties)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ varieties, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ varieties, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$varieties)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ varieties, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_varieties_stem
+alpha_div_stats_varieties_stem
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_stem_stage_III_A_2017 %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_stem_stage_III_A_2017,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_III_A_2017, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on stem samples; stage_III 2017" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_III 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_III_A_2017, "varieties")
+       + get_variable(physeq_rare_stem_stage_III_A_2017, "varieties")
+       + get_variable(physeq_rare_stem_stage_III_A_2017, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_III_A_2018
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_stem_stage_III_A_2018, x="varieties", color="varieties", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_III stem 2018")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(varieties,value,colour=varieties,shape=varieties)) +
+  facet_grid(variable ~ varieties, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="stage_III  stem 2018")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + varieties  ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ varieties, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$varieties)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ varieties, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ varieties, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$varieties)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ varieties, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_varieties_stem
+alpha_div_stats_varieties_stem
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_stem_stage_III_A_2018 %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_stem_stage_III_A_2018,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_III_A_2018, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on stem samples; stage_III 2018" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_III 2018") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_III_A_2018, "varieties")
+       + get_variable(physeq_rare_stem_stage_III_A_2018, "varieties")
+       + get_variable(physeq_rare_stem_stage_III_A_2018, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+*stem*
+physeq_rare_stem_stage_I
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+p <- plot_richness(physeq_rare_stem_stage_I, x="varieties", color="varieties", measures=c("Observed","Shannon"), nrow = 1)+   
+  scale_color_manual(values=c("#009E73","#E69F00","#BB22AD","#224FBB" , "#1BDDD9"), name="stage_I stem 2017")
+
+## representation complete de effet les grand groupe genetique et des compartiments de la plante
+
+ggplot(p$data,aes(varieties,value,colour=varieties,shape=varieties)) +
+  facet_grid(variable ~ varieties, drop=T,scale="free",space="fixed") +
+  geom_violin() +
+    geom_jitter(shape=16, position=position_jitter(0.2)) +
+  ylab("Diversity index")  + xlab(NULL) + theme_bw() +   
+     scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="stage_I  stem 2017")
+
+
+## Export the alpha div values
+rich.plus <- dcast(p$data, bloc + varieties  ~ variable)
+
+
+## Alpha-div Stats 
+#stage
+TukeyHSD_Observed <- TukeyHSD(aov(Observed ~ varieties, data =  rich.plus))
+TukeyHSD_Observed_df <- data.frame(TukeyHSD_Observed$varieties)
+TukeyHSD_Observed_df$measure = "Observed"
+TukeyHSD_Observed_df$shapiro_test_pval = (shapiro.test(residuals(aov(Observed ~ varieties, data =  rich.plus))))$p.value
+
+TukeyHSD_Shannon <- TukeyHSD(aov(Shannon ~ varieties, data =  rich.plus))
+TukeyHSD_Shannon_df <- data.frame(TukeyHSD_Shannon$varieties)
+TukeyHSD_Shannon_df$measure = "Shannon"
+TukeyHSD_Shannon_df$shapiro_test_pval = (shapiro.test(residuals(aov(Shannon ~ varieties, data =  rich.plus))))$p.value
+cbind(TukeyHSD_Observed_df,TukeyHSD_Shannon_df)->alpha_div_stats_varieties_stem
+alpha_div_stats_varieties_stem
+
+
+rich.plus$Observed -> OTU_richness
+
+physeq_rare_stem_stage_I %>% transform_sample_counts(function(x) x/sum(x)) %>%
+  otu_table() %>%
+  t() %>%
+  sqrt() %>%
+  as.data.frame() %>%
+  vegdist(binary=T, method = "bray") -> dist
+ord <- ordinate(physeq_rare_stem_stage_I,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_I, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt Jaccard on stem samples; stage_I 2017" ) + 
+  #geom_point(aes(size=OTU_richness)) +
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_I 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_I, "varieties")
+       + get_variable(physeq_rare_stem_stage_I, "varieties")
+       + get_variable(physeq_rare_stem_stage_I, "bloc"),permutations = 10000)$aov.tab
+
+```
