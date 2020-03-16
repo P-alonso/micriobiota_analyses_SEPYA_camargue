@@ -1,0 +1,717 @@
+---
+title: "metacoder with plant"
+author: "Camargue-Pascal"
+date: "4 novembre 2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+
+library(phyloseq)
+library(tidyverse)
+library(vegan)
+library(metacoder)
+
+seed <- 123
+ min_reads_root <- 5000 ## define minimum reads threshold
+ min_reads_stem <- 10000 ## define minimum reads threshold
+ min_reads_seed <- 10000 ## define minimum reads threshold
+ min_reads <- 10000
+ width <- 11 ## size plot
+ height <- 11 ## size plot
+taxonomic_levels <- c("Kingdom","Phylum", "Class",
+                      "Order", "Family", "Genus", "Species")
+
+## set working directory
+setwd("~/cirad/cahier de laboratoire/16s chine/analyses fred/test r studio/r-studio_OTU_table/work")
+##load OTUtable
+input <- "Camargue_16S_roots_and_stems_20190920_1593_samples.OTU.filtered.cleaved.nosubstringOTUs.table"
+##load metadata
+metadata <- "camargue_metadata2.txt"
+
+## extract negative and positive control to select cotaminant reads
+read_tsv(input) %>% 
+  filter(! grepl("No_hit", taxonomy)) %>%
+  select(OTU, starts_with("T"),  -total, -taxonomy)->contaminants
+
+    # calculate max reads of control samples
+      contaminants %>%
+        gather(key = "samples", value = "reads", -OTU)%>%
+        mutate(samples = str_replace(samples, "^[tT].*", "control")) %>% # rename control samples by control
+        group_by(OTU, samples) %>%
+        summarize(max = max(reads)) %>%
+        select(-samples)->conta_max
+
+
+## OTU Tables remove contaminant reads and dynamic project (mas du peint)
+read_tsv(input) %>% 
+    filter(! grepl("No_hit|Mitochondria|Chloroplast", taxonomy)) %>%
+    select(-starts_with("T"),-starts_with("D"),-starts_with("vide"),
+           -total, -cloud,-amplicon,	-length,	-abundance,
+           -chimera,	-spread,	-quality,	-sequence, -identity,	
+           -taxonomy,	-references) %>% 
+    gather("samples", "reads", -OTU) %>%
+    left_join(conta_max, by = "OTU") %>%
+    mutate(reads = case_when(
+               is.na(max)  ~ reads,
+               max > reads ~ as.double(0),
+               TRUE      ~ reads - max)) %>%
+    select(-max) %>%
+    spread(samples, reads, fill = 0) -> otu1
+
+
+# sum OTU assigned to Mitochondria and Chloroplast to OTU 1 and 2 respectively 
+        read_tsv(input) %>%
+            filter( grepl("Chloroplast", taxonomy)) %>%
+            select(-starts_with("T"),-starts_with("D"),-starts_with("vide"),
+                   -total, -cloud,-amplicon,-length, -abundance, -chimera,
+                   -spread, -quality, -sequence, -identity, -taxonomy,
+                   -references, -OTU) %>%
+            gather("samples", "reads") %>%
+            count(samples, wt = reads) %>%
+            rename (OTU = samples) %>% 
+            rename ("1" = n) %>% 
+            column_to_rownames(var = "OTU") %>%
+            t() %>%
+            as.data.frame() ->df2
+
+        read_tsv(input) %>%
+          filter( grepl("Mitochondria", taxonomy)) %>%    
+          select(-starts_with("T"),-starts_with("D"),-starts_with("vide"),
+                 -total, -cloud,-amplicon,-length, -abundance,-chimera,
+                 -spread, -quality, -sequence, -identity,-taxonomy,
+                 -references, -OTU) %>%
+          gather("samples", "reads") %>%
+          count(samples, wt = reads) %>% 
+          rename (OTU = samples) %>%
+          rename ("2" = n) %>%
+          column_to_rownames(var = "OTU") %>%
+          t() %>%  
+          as.data.frame() %>% 
+          bind_rows(df2, .id="OTU") %>% 
+          mutate(OTU=as.numeric(OTU)) %>% 
+          union(otu1, by="OTU")%>% 
+          arrange(OTU)->otu
+         otu1 %>% union(otu,by="OTU") %>% arrange(OTU)->otu       
+## OTU Tables samples : SEPYA for seed, stem and roots
+
+otu [, -grep("-R|-T", colnames(otu))]->s_otu
+
+otu [, -grep("G|-T", colnames(otu))]->r_otu
+
+otu [, -grep("G|-R", colnames(otu))]->t_otu
+
+
+## remove samples under sequensing deep threshold (defined on the line 28)
+    # root samples
+    
+            r_otu %>%
+            filter(., !OTU==1) %>% 
+            filter(., !OTU==2) %>% 
+            gather(key = "samples", value = "reads", -OTU) %>%
+            group_by(samples) %>%
+            filter(sum(reads) >= min_reads_root) %>%
+            group_by(OTU) %>% 
+            filter(sum(reads) >= 1) %>% # remove OTU with 0 reads
+            ungroup() %>%
+            spread(samples, reads)-> otu_r2 
+            
+
+      # stem samples
+            t_otu %>% 
+              gather(key = "samples", value = "reads", -OTU) %>%
+            group_by(samples) %>%
+            filter(sum(reads) >= min_reads_stem) %>%
+            group_by(OTU) %>% 
+            filter(sum(reads) >= 1) %>% # remove OTU with 0 reads
+            ungroup() %>%
+            spread(samples, reads) -> otu_s2
+
+                
+        # seed samples
+         s_otu %>% 
+            gather(key = "samples", value = "reads", -OTU) %>%
+            group_by(samples) %>%
+            filter(sum(reads) >= min_reads_seed) %>%
+            group_by(OTU) %>% 
+            filter(sum(reads) >= 1) %>% # remove OTU with 0 reads
+            ungroup() %>%
+            spread(samples, reads)-> otu_seed2  
+        
+          # whole samples
+        otu %>% 
+            gather(key = "samples", value = "reads", -OTU) %>%
+            group_by(samples) %>%
+            filter(sum(reads) >= min_reads) %>%
+            group_by(OTU) %>% 
+            filter(sum(reads) >= 1) %>% # remove OTU with 0 reads
+            ungroup() %>%
+            spread(samples, reads)-> otu2  
+ 
+##### Roots: keep OTU present in the two replicates and sum reads of the two replicate
+    otu_r2 %>%
+      gather(key = "samples", value = "reads", -OTU)  %>%
+      separate(samples, c("samples", "seq_number"), sep = "_") %>%
+      separate(samples, c("samples", "replicats"), sep = "b$")->df
+    
+      df[is.na(df$replicats),"replicats"]<-"a"
+      df[df$replicats == "", "replicats"] <- NA
+      df[is.na(df$replicats),"replicats"]<-"b"
+    
+      df %>%
+        group_by(OTU, samples) %>%
+        mutate(n_replicates = n()) %>%
+        filter(reads > 0) %>%
+        mutate(n_occur = n()) %>%
+        ungroup() %>%
+        mutate(ratio= n_occur/n_replicates) %>%# calculate the prevalence for each OTU in each duplicate
+        mutate(replicats = str_replace(replicats, "a", "")) %>%
+        mutate(removed_otu = replace(n_occur, which(ratio <1), 0)) %>%  # remove OTU presents only in one of the duplicate
+        mutate(removed_otu = replace(removed_otu, which(ratio >= 1), 1)) %>%  # keep only OTU presents in the two duplicate
+        mutate(reads= removed_otu * reads) %>%
+        distinct(OTU, samples, reads) %>% # extract only OTU samples and reads columns
+        group_by(OTU) %>% 
+        filter(sum(reads) >= 1) %>%
+        ungroup() %>% 
+        count(OTU,samples, wt = reads) %>% 
+        group_by(OTU) %>% ##remove otu with prensent in less than 3 sample
+    filter(n > 0) %>%
+    mutate(n_occur=n()) %>% 
+    filter(n_occur > 3) %>%
+    ungroup() %>%
+    distinct(OTU, samples, n) %>%
+        spread(samples, n) %>% 
+        replace(is.na(.), 0)->otu_r2
+                
+                
+ #### Stems and seeds and all samples: sum reads of the two replicate
+
+      otu_s2 %>%
+        gather(key = "samples", value = "reads", -OTU)  %>%
+        separate(samples, c("samples", "seq_number"), sep = "_") %>%
+        separate(samples, c("samples", "replicats"), sep = "b$") %>% 
+        count(OTU,samples, wt = reads) %>% #sum reads of replicate
+        group_by(OTU) %>% ##remove otu with prensent in less than 3 samples
+        filter(n > 0) %>%
+        mutate(n_occur=n()) %>% 
+        filter(n_occur > 3) %>%
+        ungroup() %>%
+        distinct(OTU, samples, n) %>% # extract only OTU samples and reads columns
+        spread(samples, n)%>% 
+        replace(is.na(.), 0) -> otu_s2
+      
+      otu_seed2 %>%
+        gather(key = "samples", value = "reads", -OTU)  %>%
+        separate(samples, c("samples", "seq_number"), sep = "_") %>%
+        separate(samples, c("samples", "replicats"), sep = "b$") %>% 
+        count(OTU,samples, wt = reads) %>% #sum reads of replicate
+        group_by(OTU) %>% ##remove otu with prensent in less than 2 samples
+        filter(n > 0) %>%
+        mutate(n_occur=n()) %>% 
+        filter(n_occur > 2) %>%
+        ungroup() %>%
+        distinct(OTU, samples, n) %>% # extract only OTU samples and reads columns
+        spread(samples, n)%>% 
+        replace(is.na(.), 0) -> otu_seed2  
+      
+      otu2 %>%
+        gather(key = "samples", value = "reads", -OTU)  %>%
+        separate(samples, c("samples", "seq_number"), sep = "_") %>%
+        separate(samples, c("samples", "replicats"), sep = "b$") %>% 
+        count(OTU,samples, wt = reads) %>% #sum reads of replicate
+        group_by(OTU) %>% ##remove otu with prensent in less than 3 sample
+        filter(n > 0) %>%
+        mutate(n_occur=n()) %>% 
+        filter(n_occur > 3) %>%
+        ungroup() %>%
+        distinct(OTU, samples, n) %>% # extract only OTU samples and reads columns
+        spread(samples, n)%>% 
+        replace(is.na(.), 0) -> otu2  
+                
+##### make tax_dat
+
+read_tsv(input) %>%
+    select(OTU, taxonomy)  %>%
+    separate(taxonomy, taxonomic_levels,
+             sep = "[|]", fill = "right", extra = "drop") %>%
+    mutate_if(is.character,
+              funs(str_replace(.,
+                               "unknown|uncultured|unidentified|\\*",
+                               replacement = NA_character_))) %>%
+    mutate(taxonomy = str_glue_data(.,
+                                    "Root;k__{Kingdom}",
+                                    ";p__{Phylum}",
+                                    ";c__{Class}",
+                                    ";o__{Order}",
+                                    ";f__{Family}",
+                                    ";g__{Genus}",
+                                    ";s__{Species}",
+                                    sep = "|")) %>%
+    mutate(taxonomy = str_glue_data(.,"{taxonomy}",
+                                      ";ssp__{OTU}", 
+                                      sep = "|")) %>% 
+    mutate(taxonomy = as.character(taxonomy)) %>%
+    distinct(OTU, taxonomy)-> tax_data
+
+ otu_r2 %>% 
+inner_join(tax_data, by = "OTU") ->otu_root # keep only OTU present in otu_root
+ otu_s2 %>% 
+inner_join(tax_data, by = "OTU") ->otu_stem
+ otu_seed2 %>% 
+inner_join(tax_data, by = "OTU") ->otu_seed
+ otu2 %>% 
+inner_join(tax_data, by = "OTU") ->otu
+
+ 
+  
+   ## prepare metadata, keep only one replicate sample (remove letter a and b and library number)
+read_tsv(metadata) %>% 
+  separate(samples, c("samples", "lib_number"), sep = "_") %>%
+  separate(samples, c("samples", "replicats"), sep = "b$") %>% 
+  mutate(replicats = str_replace(replicats, "//NA", "b"))-> sample_data
+ 
+sample_data[is.na(sample_data$replicats),"replicats"]<-"a"
+
+sample_data %>% 
+  filter(grepl("a", replicats))-> sample_data  
+
+
+## keep in sample_data common sample with otu_data
+
+df_root <- data.frame(samples=colnames(otu_root)[-1],stringsAsFactors = FALSE)
+sample_data_root<- merge(sample_data, df_root, by = "samples")
+
+df_stem <- data.frame(samples=colnames(otu_stem)[-1],stringsAsFactors = FALSE)
+sample_data_stem<- merge(sample_data, df_stem, by = "samples")
+
+df_seed <- data.frame(samples=colnames(otu_seed)[-1],stringsAsFactors = FALSE)
+sample_data_seed<- merge(sample_data, df_seed, by = "samples")
+
+df <- data.frame(samples=colnames(otu)[-1],stringsAsFactors = FALSE)
+sample_data<- merge(sample_data, df, by = "samples")
+```
+
+make metacoder object
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+#### make metacoder object
+
+obj <- parse_tax_data(otu,
+                           class_cols = "taxonomy", 
+                           class_sep = ";",
+                           class_regex = "^([a-z]{0,1})_{0,2}(.*)$",
+                           class_key = c("tax_rank" = "taxon_rank",
+                                         "name" = "taxon_name")) 
+obj_root <- parse_tax_data(otu_root,
+                           class_cols = "taxonomy", 
+                           class_sep = ";",
+                           class_regex = "^([a-z]{0,1})_{0,2}(.*)$",
+                           class_key = c("tax_rank" = "taxon_rank",
+                                         "name" = "taxon_name")) 
+
+obj_stem <- parse_tax_data(otu_stem,
+                           class_cols = "taxonomy", 
+                           class_sep = ";",
+                           class_regex = "^([a-z]{0,1})_{0,2}(.*)$",
+                           class_key = c("tax_rank" = "taxon_rank",
+                                         "name" = "taxon_name")) 
+obj_seed <- parse_tax_data(otu_seed,
+                           class_cols = "taxonomy", 
+                           class_sep = ";",
+                           class_regex = "^([a-z]{0,1})_{0,2}(.*)$",
+                           class_key = c("tax_rank" = "taxon_rank",
+                                         "name" = "taxon_name")) 
+
+
+
+
+## éliminer les données class_data de l'objet car celle-ci ne sont pas informatives  
+obj$data$class_data <- NULL
+obj_root$data$class_data <- NULL
+obj_stem$data$class_data <- NULL
+obj_seed$data$class_data <- NULL
+##renommer tax_data en otu_count qui est plus informatif
+names(obj$data) <- "otu_counts"
+names(obj_root$data) <- "otu_counts"
+names(obj_stem$data) <- "otu_counts"
+names(obj_seed$data) <- "otu_counts"
+
+```
+
+
+rarefying data
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+#tranform OTU_id to character
+obj$data$otu_counts %>% 
+mutate(OTU = as.character(OTU))->obj$data$otu_counts 
+
+obj_root$data$otu_counts %>% 
+mutate(OTU = as.character(OTU))->obj_root$data$otu_counts
+
+obj_stem$data$otu_counts %>% 
+mutate(OTU = as.character(OTU))->obj_stem$data$otu_counts
+
+obj_seed$data$otu_counts %>% 
+mutate(OTU = as.character(OTU))->obj_seed$data$otu_counts
+
+#rarefying data 
+obj$data$otu_rarefied <- rarefy_obs(obj, "otu_counts", other_cols = TRUE)
+
+obj_root$data$otu_rarefied <- rarefy_obs(obj_root, "otu_counts", other_cols = TRUE)
+
+obj_stem$data$otu_rarefied <- rarefy_obs(obj_stem, "otu_counts", other_cols = TRUE)
+
+obj_seed$data$otu_rarefied <- rarefy_obs(obj_seed, "otu_counts", other_cols = TRUE)
+
+
+### remove OTU with 0 reads 
+
+no_reads <- rowSums(obj_root$data$otu_rarefied[, sample_data_root$samples]) == 0
+obj_root <- filter_obs(obj_root, "otu_rarefied", ! no_reads)
+
+no_reads <- rowSums(obj_stem$data$otu_rarefied[, sample_data_stem$samples]) == 0
+obj_stem <- filter_obs(obj_stem, "otu_rarefied", ! no_reads)
+
+no_reads <- rowSums(obj_seed$data$otu_rarefied[, sample_data_seed$samples]) == 0
+obj_seed <- filter_obs(obj_seed, "otu_rarefied", ! no_reads)
+
+no_reads <- rowSums(obj$data$otu_rarefied[, sample_data$samples]) == 0
+obj <- filter_obs(obj, "otu_rarefied", ! no_reads)
+
+```
+ Save metacoder object
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+save(obj,obj_root, obj_stem, obj_seed, file = "metacoder_camargue.RData")
+```
+
+
+
+
+
+
+Pairways heat tree
+
+whole plant plant compartment 
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+##calculer abondance de chaque taxon groupé par génotype sur les données ITS tiges
+obj$data$tax_abund <- calc_taxon_abund(obj, "otu_rarefied")
+##calculer abundance moyenne de chaque taxon par conditions ici genotype
+obj$data$type_abund <- calc_group_mean(obj, "tax_abund",
+                                       cols = sample_data$samples,
+                                       groups = sample_data$compartment)
+
+print(obj$data$type_abund)
+
+
+##comparaison des différences d'abondances entre plusieurs conditions ici en fonction du génotype
+obj$data$diff_table <- compare_groups(obj, data = "tax_abund",
+                                      cols = sample_data$samples,
+                                      groups = sample_data$compartment)
+print(obj$data$diff_table)
+
+obj <- mutate_obs(obj, "diff_table",
+                  wilcox_p_value = p.adjust(wilcox_p_value, method = "fdr"))
+
+obj$data$diff_table$log2_median_ratio[obj$data$diff_table$wilcox_p_value > 0.05] <- 0   
+
+obj %>%
+  taxa::filter_taxa(taxon_ranks == "s", supertaxa = TRUE) %>%
+  mutate_obs("cleaned_names", gsub(taxon_names, pattern = "\\[|\\]", replacement = "")) %>%
+  taxa::filter_taxa(grepl(cleaned_names, pattern = "^[a-zA-Z]+$")) %>%
+  heat_tree_matrix(data = "diff_table",
+                   node_label = cleaned_names,
+                   node_size = n_obs, # number of OTUs
+                   node_color = log2_median_ratio, # difference between groups
+                   node_color_trans = "linear",
+                   node_color_interval = c(-3, 3), # symmetric interval
+                   edge_color_interval = c(-3, 3), # symmetric interval
+                   node_color_range = diverging_palette(), # diverging colors
+                   node_size_axis_label = "OTU count",
+                   node_color_axis_label = "Log 2 ratio of median counts",
+                   layout = "da", initial_layout = "re",
+                   key_size = 0.67,
+                   seed = 2,
+                   output_file = "heat_tree_camargue_plant_compartment.pdf")
+                   
+```
+representer table difference d'abondance plant compartement
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+obj$data$type_abund %>% 
+  inner_join(obj$data$otu_rarefied, by = "taxon_id") %>% 
+  inner_join(obj$data$diff_table, by = "taxon_id") %>% 
+  select (-c(starts_with("YY"))) %>% 
+  select (-c(treatment_1,treatment_2)) %>% 
+  filter(wilcox_p_value < 0.05) %>%
+  filter(!log2_median_ratio == 0) %>% 
+  distinct(taxon_id, .keep_all = TRUE)->diff_taxa
+
+write.csv(diff_taxa,file = "diff_table_plant_compartement.csv")
+```
+
+stem samples
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+##calculer abondance de chaque taxon groupé par génotype sur les données ITS tiges
+obj_stem$data$tax_abund <- calc_taxon_abund(obj_stem, "otu_rarefied")
+
+
+
+## stage  effect stem 
+obj_stem$data$type_abund <- calc_group_mean(obj_stem, "tax_abund",
+                                       cols = sample_data_stem$samples,
+                                       groups = sample_data_stem$stage_year)
+
+print(obj_stem$data$type_abund)
+
+#comparaison des différences d'abondances entre plusieurs conditions ici en fonction du génotype
+obj_stem$data$diff_table <- compare_groups(obj_stem, data = "tax_abund",
+                                      cols = sample_data_stem$samples,
+                                      groups = sample_data_stem$stage_year)
+print(obj_stem$data$diff_table)
+
+obj_stem <- mutate_obs(obj_stem, "diff_table",
+                  wilcox_p_value = p.adjust(wilcox_p_value, method = "fdr"))
+
+obj_stem$data$diff_table$log2_median_ratio[obj_stem$data$diff_table$wilcox_p_value > 0.05] <- 0   
+
+obj_stem %>%
+  taxa::filter_taxa(taxon_ranks == "s", supertaxa = TRUE) %>%
+  mutate_obs("cleaned_names", gsub(taxon_names, pattern = "\\[|\\]", replacement = "")) %>%
+  taxa::filter_taxa(grepl(cleaned_names, pattern = "^[a-zA-Z]+$")) %>%
+  heat_tree_matrix(data = "diff_table",
+                   node_label = cleaned_names,
+                   node_size = n_obs, # number of OTUs
+                   node_color = log2_median_ratio, # difference between groups
+                   node_color_trans = "linear",
+                   node_color_interval = c(-3, 3), # symmetric interval
+                   edge_color_interval = c(-3, 3), # symmetric interval
+                   node_color_range = diverging_palette(), # diverging colors
+                   node_size_axis_label = "OTU count",
+                   node_color_axis_label = "Log 2 ratio of median counts",
+                   layout = "da", initial_layout = "re",
+                   key_size = 0.67,
+                   seed = 2,
+                   output_file = "test_heat_tree_stage_year_stem.pdf")                 
+```
+representer table difference d'abondance stage year stem
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+obj_stem$data$type_abund %>% 
+  inner_join(obj_stem$data$otu_rarefied, by = "taxon_id") %>% 
+  inner_join(obj_stem$data$diff_table, by = "taxon_id") %>% 
+  select (-c(starts_with("YY"))) %>% 
+  select (-c(treatment_1,treatment_2)) %>% 
+  filter(wilcox_p_value < 0.05) %>%
+  filter(!log2_median_ratio == 0) %>% 
+  distinct(taxon_id, .keep_all = TRUE)->diff_taxa
+
+write.csv(diff_taxa,file = "diff_table_stage_year_stem.csv")
+```
+
+
+root samples
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+##calculer abondance de chaque taxon groupé par génotype sur les données ITS tiges
+obj_root$data$tax_abund <- calc_taxon_abund(obj_root, "otu_rarefied")
+
+## stage  effect root 
+obj_root$data$type_abund <- calc_group_mean(obj_root, "tax_abund",
+                                       cols = sample_data_root$samples,
+                                       groups = sample_data_root$stage_year)
+
+print(obj_root$data$type_abund)
+
+#comparaison des différences d'abondances entre plusieurs conditions ici en fonction du génotype
+obj_root$data$diff_table <- compare_groups(obj_root, data = "tax_abund",
+                                      cols = sample_data_root$samples,
+                                      groups = sample_data_root$stage_year)
+print(obj_root$data$diff_table)
+
+obj_root <- mutate_obs(obj_root, "diff_table",
+                  wilcox_p_value = p.adjust(wilcox_p_value, method = "fdr"))
+
+obj_root$data$diff_table$log2_median_ratio[obj_root$data$diff_table$wilcox_p_value > 0.05] <- 0   
+
+obj_root %>%
+  taxa::filter_taxa(taxon_ranks == "s", supertaxa = TRUE) %>%
+  mutate_obs("cleaned_names", gsub(taxon_names, pattern = "\\[|\\]", replacement = "")) %>%
+  taxa::filter_taxa(grepl(cleaned_names, pattern = "^[a-zA-Z]+$")) %>%
+  heat_tree_matrix(data = "diff_table",
+                   node_label = cleaned_names,
+                   node_size = n_obs, # number of OTUs
+                   node_color = log2_median_ratio, # difference between groups
+                   node_color_trans = "linear",
+                   node_color_interval = c(-3, 3), # symmetric interval
+                   edge_color_interval = c(-3, 3), # symmetric interval
+                   node_color_range = diverging_palette(), # diverging colors
+                   node_size_axis_label = "OTU count",
+                   node_color_axis_label = "Log 2 ratio of median counts",
+                   layout = "da", initial_layout = "re",
+                   key_size = 0.67,
+                   seed = 2,
+                   output_file = "test_heat_tree_stage_year_root.pdf")  
+
+
+
+##########stage_year_varieties
+
+
+##calculer abondance de chaque taxon groupé par génotype sur les données ITS tiges
+obj_root$data$tax_abund <- calc_taxon_abund(obj_root, "otu_rarefied")
+
+## stage  effect root 
+obj_root$data$type_abund <- calc_group_mean(obj_root, "tax_abund",
+                                       cols = sample_data_root$samples,
+                                       groups = sample_data_root$stage_year_varieties)
+
+print(obj_root$data$type_abund)
+
+#comparaison des différences d'abondances entre plusieurs conditions ici en fonction du génotype
+obj_root$data$diff_table <- compare_groups(obj_root, data = "tax_abund",
+                                      cols = sample_data_root$samples,
+                                      groups = sample_data_root$stage_year_varieties)
+print(obj_root$data$diff_table)
+
+obj_root <- mutate_obs(obj_root, "diff_table",
+                  wilcox_p_value = p.adjust(wilcox_p_value, method = "fdr"))
+
+obj_root$data$diff_table$log2_median_ratio[obj_root$data$diff_table$wilcox_p_value > 0.05] <- 0   
+
+obj_root %>%
+  taxa::filter_taxa(taxon_ranks == "s", supertaxa = TRUE) %>%
+  mutate_obs("cleaned_names", gsub(taxon_names, pattern = "\\[|\\]", replacement = "")) %>%
+  taxa::filter_taxa(grepl(cleaned_names, pattern = "^[a-zA-Z]+$")) %>%
+  heat_tree_matrix(data = "diff_table",
+                   node_label = cleaned_names,
+                   node_size = n_obs, # number of OTUs
+                   node_color = log2_median_ratio, # difference between groups
+                   node_color_trans = "linear",
+                   node_color_interval = c(-3, 3), # symmetric interval
+                   edge_color_interval = c(-3, 3), # symmetric interval
+                   node_color_range = diverging_palette(), # diverging colors
+                   node_size_axis_label = "OTU count",
+                   node_color_axis_label = "Log 2 ratio of median counts",
+                   layout = "da", initial_layout = "re",
+                   key_size = 0.67,
+                   seed = 2,
+                   output_file = "test_heat_tree_stage_year_varieties_root.pdf")  
+
+```
+representer table difference d'abondance stage year root
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+obj_root$data$type_abund %>% 
+  inner_join(obj_root$data$otu_rarefied, by = "taxon_id") %>% 
+  inner_join(obj_root$data$diff_table, by = "taxon_id") %>% 
+  select (-c(starts_with("YY"))) %>% 
+  select (-c(treatment_1,treatment_2)) %>% 
+  filter(wilcox_p_value < 0.05) %>%
+  filter(!log2_median_ratio == 0) %>% 
+  distinct(taxon_id, .keep_all = TRUE)->diff_taxa
+
+write.csv(diff_taxa,file = "diff_table_stage_year_root.csv")
+```
+
+seed samples
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+# stage development comparison
+obj_seed$data$tax_abund <- calc_taxon_abund(obj_seed, "otu_rarefied")
+
+obj_seed$data$type_abund <- calc_group_mean(obj_seed, "tax_abund",
+                                       cols = sample_data_seed$samples,
+                                       groups = sample_data_seed$stage)
+
+obj_seed$data$diff_table <- compare_groups(obj_seed, data = "tax_abund",
+                                      cols = sample_data_seed$samples,
+                                      groups = sample_data_seed$stage)
+
+
+obj_seed <- mutate_obs(obj_seed, "diff_table",
+                  wilcox_p_value = p.adjust(wilcox_p_value, method = "fdr"))
+
+obj_seed$data$diff_table$log2_median_ratio[obj_seed$data$diff_table$wilcox_p_value > 0.05] <- 0
+
+
+set.seed(1)
+obj_seed %>%
+  mutate_obs("cleaned_names", gsub(taxon_names, pattern = "\\[|\\]", replacement = "")) %>%
+  taxa::filter_taxa(grepl(cleaned_names, pattern = "^[a-zA-Z]+$")) %>%
+  heat_tree(node_label = taxon_names,
+            node_size = n_obs, # number of OTUs
+            node_color = log2_median_ratio, # difference between groups
+            node_color_interval = c(-10, 10), # symmetric interval
+            node_color_range = c("#E69F00", "gray", "#009E73"), # diverging colors
+            node_size_axis_label = "OTU count",
+            node_color_axis_label = "Log 2 ratio of median counts",
+            layout = "da", initial_layout = "re",
+            output_file = "test_heat_tree_stage_seed.pdf")
+
+
+
+
+######### varieties stage 
+
+obj_seed$data$tax_abund <- calc_taxon_abund(obj_seed, "otu_rarefied")
+
+## varieties_stage  effect seed 
+obj_seed$data$type_abund <- calc_group_mean(obj_seed, "tax_abund",
+                                       cols = sample_data_seed$samples,
+                                       groups = sample_data_seed$varieties_stage)
+
+print(obj_seed$data$type_abund)
+
+#comparaison des différences d'abondances entre plusieurs conditions ici en fonction du génotype
+obj_seed$data$diff_table <- compare_groups(obj_seed, data = "tax_abund",
+                                      cols = sample_data_seed$samples,
+                                      groups = sample_data_seed$varieties_stage)
+print(obj_seed$data$diff_table)
+
+obj_seed <- mutate_obs(obj_seed, "diff_table",
+                  wilcox_p_value = p.adjust(wilcox_p_value, method = "fdr"))
+
+obj_seed$data$diff_table$log2_median_ratio[obj_seed$data$diff_table$wilcox_p_value > 0.05] <- 0   
+
+obj_seed %>%
+  taxa::filter_taxa(taxon_ranks == "s", supertaxa = TRUE) %>%
+  mutate_obs("cleaned_names", gsub(taxon_names, pattern = "\\[|\\]", replacement = "")) %>%
+  taxa::filter_taxa(grepl(cleaned_names, pattern = "^[a-zA-Z]+$")) %>%
+  heat_tree_matrix(data = "diff_table",
+                   node_label = cleaned_names,
+                   node_size = n_obs, # number of OTUs
+                   node_color = log2_median_ratio, # difference between groups
+                   node_color_trans = "linear",
+                   node_color_interval = c(-3, 3), # symmetric interval
+                   edge_color_interval = c(-3, 3), # symmetric interval
+                   node_color_range = diverging_palette(), # diverging colors
+                   node_size_axis_label = "OTU count",
+                   node_color_axis_label = "Log 2 ratio of median counts",
+                   layout = "da", initial_layout = "re",
+                   key_size = 0.67,
+                   seed = 2,
+                   output_file = "test_heat_tree_varieties_stage_seed.pdf") 
+
+```
+
+representer table difference d'abondance stage year seed
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+obj_seed$data$type_abund %>% 
+  inner_join(obj_seed$data$otu_rarefied, by = "taxon_id") %>% 
+  inner_join(obj_seed$data$diff_table, by = "taxon_id") %>% 
+  select (-c(starts_with("YY"))) %>% 
+  select (-c(treatment_1,treatment_2)) %>% 
+  filter(wilcox_p_value < 0.05) %>%
+  filter(!log2_median_ratio == 0) %>% 
+  distinct(taxon_id, .keep_all = TRUE)->diff_taxa
+
+write.csv(diff_taxa,file = "diff_table_stage_year_seed.csv")
+```
