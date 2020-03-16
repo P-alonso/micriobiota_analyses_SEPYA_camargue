@@ -1,0 +1,1001 @@
+---
+title: "Phyloseq camargue Unifrac"
+author: "pascal"
+date: "14 novembre 2019"
+output: html_document
+---
+Unweighted Unifrac
+===================
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+setwd("~/cirad/cahier de laboratoire/16s chine/analyses fred/test r studio/r-studio_OTU_table/work")
+
+library(reshape2)
+library(phyloseq)
+library(tidyverse)
+library(vegan)
+
+load("physeq_camargue_with_phy_tree.RData") 
+```
+
+Microbiota in root stem and seed separately 
+============================================
+ 
+Root Beta-diversity  
+--------------------
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_root, method="unifrac", type="stage")->dist
+
+ord <- ordinate(physeq_rare_root,"PCoA",dist)
+
+plot_ordination(physeq_rare_root, 
+                ord,
+                color = "stage", 
+                shape="year",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on root samples" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota : plant stage") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root, "stage")
+       + get_variable(physeq_rare_root, "year")
+       + get_variable(physeq_rare_root, "varieties")
+       + get_variable(physeq_rare_root, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+Stem Beta-diversity  
+--------------------
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+
+distance(physeq_rare_stem, method="unifrac", type="stage")->dist
+
+ord <- ordinate(physeq_rare_stem,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem, 
+                ord,
+                color = "stage", 
+                shape="year",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on stem samples" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota : plant stage") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem, "stage")
+       + get_variable(physeq_rare_stem, "year")
+       + get_variable(physeq_rare_stem, "varieties")
+       + get_variable(physeq_rare_stem, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+seed Beta-diversity  
+--------------------
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_seed, method="unifrac", type="stage")->dist
+
+ord <- ordinate(physeq_rare_seed,"PCoA",dist)
+
+plot_ordination(physeq_rare_seed, 
+                ord,
+                color = "stage", 
+                shape="bloc",
+                label= "V",
+                title = "PCoA sqrt unweighted Unifrac on seed samples" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota : plant stage") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_seed, "stage"),permutations = 10000)$aov.tab
+
+```
+
+Year factor between each development stage
+============================================
+
+ Subset physeq stage II and III
+```{r}
+subset_samples(physeq_rare_root, stage %in% c("I")) -> physeq_rare_root_stage_I
+subset_samples(physeq_rare_root, stage %in% c("II")) -> physeq_rare_root_stage_II
+subset_samples(physeq_rare_root, stage %in% c("III")) -> physeq_rare_root_stage_III
+
+
+subset_samples(physeq_rare_stem, stage %in% c("I")) -> physeq_rare_stem_stage_I
+subset_samples(physeq_rare_stem, stage %in% c("II")) -> physeq_rare_stem_stage_II
+subset_samples(physeq_rare_stem, stage %in% c("III")) -> physeq_rare_stem_stage_III
+
+
+```
+
+
+physeq_rare_root_stage_II
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_root_stage_II, method="unifrac", type="year")->dist
+
+ord <- ordinate(physeq_rare_root_stage_II,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_II, 
+                ord,
+                color = "year", 
+                shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on root samples stage_II" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota stage_II") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_II, "year")
+       + get_variable(physeq_rare_root_stage_II, "varieties")
+       + get_variable(physeq_rare_root_stage_II, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+
+physeq_rare_root_stage_III
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_root_stage_III, method="unifrac", type="year")->dist
+
+ord <- ordinate(physeq_rare_root_stage_III,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_III, 
+                ord,
+                color = "year", 
+                shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on root samples; stage_III" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota stage_III") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_III, "year")
+       + get_variable(physeq_rare_root_stage_III, "varieties")
+       + get_variable(physeq_rare_root_stage_III, "bloc"),permutations = 10000)$aov.tab
+
+```
+physeq_rare_stem_stage_II
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_stem_stage_II, method="unifrac", type="year")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_II,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_II, 
+                ord,
+                color = "year", 
+                shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on stem samples stage_II" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota stage_II") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_II, "year")
+       + get_variable(physeq_rare_stem_stage_II, "varieties")
+       + get_variable(physeq_rare_stem_stage_II, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_II
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_stem_stage_III, method="unifrac", type="year")->dist
+
+
+ord <- ordinate(physeq_rare_stem_stage_III,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_III, 
+                ord,
+                color = "year", 
+                shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on stem samples; stage_III" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota stage_III") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_III, "year")
+       + get_variable(physeq_rare_stem_stage_III, "varieties")
+       + get_variable(physeq_rare_stem_stage_III, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+Rice genotype factor 
+====================
+
+Subset physeq  years
+```{r}
+#root
+subset_samples(physeq_rare_root_stage_II, year %in% c("A_2017")) -> physeq_rare_root_stage_II_A_2017
+
+subset_samples(physeq_rare_root_stage_II, year %in% c("A_2018")) -> physeq_rare_root_stage_II_A_2018
+
+subset_samples(physeq_rare_root_stage_III, year %in% c("A_2017")) -> physeq_rare_root_stage_III_A_2017
+
+subset_samples(physeq_rare_root_stage_III, year %in% c("A_2018")) -> physeq_rare_root_stage_III_A_2018
+
+#stem
+subset_samples(physeq_rare_stem_stage_II, year %in% c("A_2017")) -> physeq_rare_stem_stage_II_A_2017
+
+subset_samples(physeq_rare_stem_stage_II, year %in% c("A_2018")) -> physeq_rare_stem_stage_II_A_2018
+
+subset_samples(physeq_rare_stem_stage_III, year %in% c("A_2017")) -> physeq_rare_stem_stage_III_A_2017
+
+subset_samples(physeq_rare_stem_stage_III, year %in% c("A_2018")) -> physeq_rare_stem_stage_III_A_2018
+```
+
+*root*
+physeq_rare_root_stage_I
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_root_stage_I, method="unifrac", type="varieties")->dist
+
+
+ord <- ordinate(physeq_rare_root_stage_I,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_I, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on root samples; stage_I 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_I 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_I, "varieties")
+       + get_variable(physeq_rare_root_stage_I, "varieties")
+       + get_variable(physeq_rare_root_stage_I, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_root_stage_II_A_2017
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_root_stage_II_A_2017, method="unifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_root_stage_II_A_2017,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_II_A_2017, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on root samples; stage_II 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_II 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_II_A_2017, "varieties")
+       + get_variable(physeq_rare_root_stage_II_A_2017, "varieties")
+       + get_variable(physeq_rare_root_stage_II_A_2017, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_root_stage_II_A_2018
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_root_stage_II_A_2018, method="unifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_root_stage_II_A_2018,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_II_A_2018, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on root samples; stage_II 2018" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_II 2018") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_II_A_2018, "varieties")
+       + get_variable(physeq_rare_root_stage_II_A_2018, "varieties")
+       + get_variable(physeq_rare_root_stage_II_A_2018, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_root_stage_III_A_2017
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_root_stage_III_A_2017, method="unifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_root_stage_III_A_2017,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_III_A_2017, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on root samples; stage_III 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_III 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_III_A_2017, "varieties")
+       + get_variable(physeq_rare_root_stage_III_A_2017, "varieties")
+       + get_variable(physeq_rare_root_stage_III_A_2017, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_root_stage_III_A_2018
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_root_stage_III_A_2018, method="unifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_root_stage_III_A_2018,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_III_A_2018, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on root samples; stage_III 2018" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_III 2018") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_III_A_2018, "varieties")
+       + get_variable(physeq_rare_root_stage_III_A_2018, "varieties")
+       + get_variable(physeq_rare_root_stage_III_A_2018, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+*stem*
+physeq_rare_stem_stage_I
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_stem_stage_I, method="unifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_I,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_I, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on stem samples; stage_I 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_I 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_I, "varieties")
+       + get_variable(physeq_rare_stem_stage_I, "varieties")
+       + get_variable(physeq_rare_stem_stage_I, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_II_A_2017
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_stem_stage_II_A_2017, method="unifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_II_A_2017,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_II_A_2017, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on stem samples; stage_II 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_II 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_II_A_2017, "varieties")
+       + get_variable(physeq_rare_stem_stage_II_A_2017, "varieties")
+       + get_variable(physeq_rare_stem_stage_II_A_2017, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_II_A_2018
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_stem_stage_II_A_2018, method="unifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_II_A_2018,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_II_A_2018, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on stem samples; stage_II 2018" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_II 2018") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_II_A_2018, "varieties")
+       + get_variable(physeq_rare_stem_stage_II_A_2018, "varieties")
+       + get_variable(physeq_rare_stem_stage_II_A_2018, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_III_A_2017
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_stem_stage_III_A_2017, method="unifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_III_A_2017,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_III_A_2017, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on stem samples; stage_III 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_III 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_III_A_2017, "varieties")
+       + get_variable(physeq_rare_stem_stage_III_A_2017, "varieties")
+       + get_variable(physeq_rare_stem_stage_III_A_2017, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_III_A_2018
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_stem_stage_III_A_2018, method="unifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_III_A_2018,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_III_A_2018, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on stem samples; stage_III 2018" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_III 2018") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_III_A_2018, "varieties")
+       + get_variable(physeq_rare_stem_stage_III_A_2018, "varieties")
+       + get_variable(physeq_rare_stem_stage_III_A_2018, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+*stem*
+physeq_rare_stem_stage_I
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_stem_stage_I, method="unifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_I,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_I, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt unweighted Unifrac on stem samples; stage_I 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_I 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_I, "varieties")
+       + get_variable(physeq_rare_stem_stage_I, "varieties")
+       + get_variable(physeq_rare_stem_stage_I, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+Weighted UNIFRAC
+====================
+Microbiota in root stem and seed separately 
+============================================
+ 
+Root Beta-diversity  
+--------------------
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_root, method="wunifrac", type="stage")->dist
+
+ord <- ordinate(physeq_rare_root,"PCoA",dist)
+
+plot_ordination(physeq_rare_root, 
+                ord,
+                color = "stage", 
+                shape="year",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on root samples" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota : plant stage") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root, "stage")
+       + get_variable(physeq_rare_root, "year")
+       + get_variable(physeq_rare_root, "varieties")
+       + get_variable(physeq_rare_root, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+Stem Beta-diversity  
+--------------------
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+
+distance(physeq_rare_stem, method="wunifrac", type="stage")->dist
+
+ord <- ordinate(physeq_rare_stem,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem, 
+                ord,
+                color = "stage", 
+                shape="year",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on stem samples" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota : plant stage") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem, "stage")
+       + get_variable(physeq_rare_stem, "year")
+       + get_variable(physeq_rare_stem, "varieties")
+       + get_variable(physeq_rare_stem, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+seed Beta-diversity  
+--------------------
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_seed, method="wunifrac", type="stage")->dist
+
+ord <- ordinate(physeq_rare_seed,"PCoA",dist)
+
+plot_ordination(physeq_rare_seed, 
+                ord,
+                color = "stage", 
+                shape="bloc",
+                label= "V",
+                title = "PCoA sqrt weighted Unifrac on seed samples" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota : plant stage") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_seed, "stage"),permutations = 10000)$aov.tab
+
+```
+
+Year factor between each development stage
+============================================
+
+ Subset physeq stage II and III
+```{r}
+subset_samples(physeq_rare_root, stage %in% c("I")) -> physeq_rare_root_stage_I
+subset_samples(physeq_rare_root, stage %in% c("II")) -> physeq_rare_root_stage_II
+subset_samples(physeq_rare_root, stage %in% c("III")) -> physeq_rare_root_stage_III
+
+
+subset_samples(physeq_rare_stem, stage %in% c("I")) -> physeq_rare_stem_stage_I
+subset_samples(physeq_rare_stem, stage %in% c("II")) -> physeq_rare_stem_stage_II
+subset_samples(physeq_rare_stem, stage %in% c("III")) -> physeq_rare_stem_stage_III
+
+
+```
+
+
+physeq_rare_root_stage_II
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_root_stage_II, method="wunifrac", type="year")->dist
+
+ord <- ordinate(physeq_rare_root_stage_II,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_II, 
+                ord,
+                color = "year", 
+                shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on root samples stage_II" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota stage_II") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_II, "year")
+       + get_variable(physeq_rare_root_stage_II, "varieties")
+       + get_variable(physeq_rare_root_stage_II, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+
+physeq_rare_root_stage_III
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_root_stage_III, method="wunifrac", type="year")->dist
+
+ord <- ordinate(physeq_rare_root_stage_III,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_III, 
+                ord,
+                color = "year", 
+                shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on root samples; stage_III" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota stage_III") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_III, "year")
+       + get_variable(physeq_rare_root_stage_III, "varieties")
+       + get_variable(physeq_rare_root_stage_III, "bloc"),permutations = 10000)$aov.tab
+
+```
+physeq_rare_stem_stage_II
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_stem_stage_II, method="wunifrac", type="year")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_II,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_II, 
+                ord,
+                color = "year", 
+                shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on stem samples stage_II" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota stage_II") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_II, "year")
+       + get_variable(physeq_rare_stem_stage_II, "varieties")
+       + get_variable(physeq_rare_stem_stage_II, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_II
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_stem_stage_III, method="wunifrac", type="year")->dist
+
+
+ord <- ordinate(physeq_rare_stem_stage_III,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_III, 
+                ord,
+                color = "year", 
+                shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on stem samples; stage_III" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9"), name="Rice microbiota stage_III") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_III, "year")
+       + get_variable(physeq_rare_stem_stage_III, "varieties")
+       + get_variable(physeq_rare_stem_stage_III, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+Rice genotype factor 
+====================
+
+Subset physeq  years
+```{r}
+#root
+subset_samples(physeq_rare_root_stage_II, year %in% c("A_2017")) -> physeq_rare_root_stage_II_A_2017
+
+subset_samples(physeq_rare_root_stage_II, year %in% c("A_2018")) -> physeq_rare_root_stage_II_A_2018
+
+subset_samples(physeq_rare_root_stage_III, year %in% c("A_2017")) -> physeq_rare_root_stage_III_A_2017
+
+subset_samples(physeq_rare_root_stage_III, year %in% c("A_2018")) -> physeq_rare_root_stage_III_A_2018
+
+#stem
+subset_samples(physeq_rare_stem_stage_II, year %in% c("A_2017")) -> physeq_rare_stem_stage_II_A_2017
+
+subset_samples(physeq_rare_stem_stage_II, year %in% c("A_2018")) -> physeq_rare_stem_stage_II_A_2018
+
+subset_samples(physeq_rare_stem_stage_III, year %in% c("A_2017")) -> physeq_rare_stem_stage_III_A_2017
+
+subset_samples(physeq_rare_stem_stage_III, year %in% c("A_2018")) -> physeq_rare_stem_stage_III_A_2018
+```
+
+*root*
+physeq_rare_root_stage_I
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_root_stage_I, method="wunifrac", type="varieties")->dist
+
+
+ord <- ordinate(physeq_rare_root_stage_I,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_I, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on root samples; stage_I 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_I 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_I, "varieties")
+       + get_variable(physeq_rare_root_stage_I, "varieties")
+       + get_variable(physeq_rare_root_stage_I, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_root_stage_II_A_2017
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_root_stage_II_A_2017, method="wunifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_root_stage_II_A_2017,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_II_A_2017, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on root samples; stage_II 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_II 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_II_A_2017, "varieties")
+       + get_variable(physeq_rare_root_stage_II_A_2017, "varieties")
+       + get_variable(physeq_rare_root_stage_II_A_2017, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_root_stage_II_A_2018
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_root_stage_II_A_2018, method="wunifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_root_stage_II_A_2018,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_II_A_2018, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on root samples; stage_II 2018" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_II 2018") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_II_A_2018, "varieties")
+       + get_variable(physeq_rare_root_stage_II_A_2018, "varieties")
+       + get_variable(physeq_rare_root_stage_II_A_2018, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_root_stage_III_A_2017
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_root_stage_III_A_2017, method="wunifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_root_stage_III_A_2017,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_III_A_2017, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on root samples; stage_III 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_III 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_III_A_2017, "varieties")
+       + get_variable(physeq_rare_root_stage_III_A_2017, "varieties")
+       + get_variable(physeq_rare_root_stage_III_A_2017, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_root_stage_III_A_2018
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+distance(physeq_rare_root_stage_III_A_2018, method="wunifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_root_stage_III_A_2018,"PCoA",dist)
+
+plot_ordination(physeq_rare_root_stage_III_A_2018, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on root samples; stage_III 2018" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_III 2018") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_root_stage_III_A_2018, "varieties")
+       + get_variable(physeq_rare_root_stage_III_A_2018, "varieties")
+       + get_variable(physeq_rare_root_stage_III_A_2018, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+*stem*
+physeq_rare_stem_stage_I
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_stem_stage_I, method="wunifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_I,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_I, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on stem samples; stage_I 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_I 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_I, "varieties")
+       + get_variable(physeq_rare_stem_stage_I, "varieties")
+       + get_variable(physeq_rare_stem_stage_I, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_II_A_2017
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_stem_stage_II_A_2017, method="wunifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_II_A_2017,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_II_A_2017, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on stem samples; stage_II 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_II 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_II_A_2017, "varieties")
+       + get_variable(physeq_rare_stem_stage_II_A_2017, "varieties")
+       + get_variable(physeq_rare_stem_stage_II_A_2017, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_II_A_2018
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_stem_stage_II_A_2018, method="wunifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_II_A_2018,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_II_A_2018, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on stem samples; stage_II 2018" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_II 2018") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_II_A_2018, "varieties")
+       + get_variable(physeq_rare_stem_stage_II_A_2018, "varieties")
+       + get_variable(physeq_rare_stem_stage_II_A_2018, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_III_A_2017
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_stem_stage_III_A_2017, method="wunifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_III_A_2017,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_III_A_2017, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on stem samples; stage_III 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_III 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_III_A_2017, "varieties")
+       + get_variable(physeq_rare_stem_stage_III_A_2017, "varieties")
+       + get_variable(physeq_rare_stem_stage_III_A_2017, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+physeq_rare_stem_stage_III_A_2018
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_stem_stage_III_A_2018, method="wunifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_III_A_2018,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_III_A_2018, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on stem samples; stage_III 2018" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_III 2018") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_III_A_2018, "varieties")
+       + get_variable(physeq_rare_stem_stage_III_A_2018, "varieties")
+       + get_variable(physeq_rare_stem_stage_III_A_2018, "bloc"),permutations = 10000)$aov.tab
+
+```
+
+*stem*
+physeq_rare_stem_stage_I
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+distance(physeq_rare_stem_stage_I, method="wunifrac", type="varieties")->dist
+
+ord <- ordinate(physeq_rare_stem_stage_I,"PCoA",dist)
+
+plot_ordination(physeq_rare_stem_stage_I, 
+                ord,
+                color = "varieties", 
+                #shape="varieties",
+                #label= "field",
+                title = "PCoA sqrt weighted Unifrac on stem samples; stage_I 2017" ) + 
+  
+  theme_bw()+ scale_color_manual(values=c("#009E73","#E69F00","#BB22AD", "#224FBB" , "#1BDDD9","#DD471B"), name="Rice microbiota stage_I 2017") 
+
+
+# PERMANOVA
+adonis(dist ~ get_variable(physeq_rare_stem_stage_I, "varieties")
+       + get_variable(physeq_rare_stem_stage_I, "varieties")
+       + get_variable(physeq_rare_stem_stage_I, "bloc"),permutations = 10000)$aov.tab
+
+```
